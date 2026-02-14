@@ -1174,7 +1174,6 @@ export default function Main() {
 
   const handleLogout = async () => {
     try {
-      // 서버에 로그아웃 요청 (인터셉터가 부착된 api 객체 사용)
       await api.post("/api/auth/logout");
     } catch (error) {
       console.error("로그아웃 중 오류 발생:", error);
