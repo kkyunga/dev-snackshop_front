@@ -20,31 +20,39 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      refetchOnWindowFocus: false, // 창 포커스 시 자동 새로고침 방지
+      refetchOnWindowFocus: false,
     },
   },
 });
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
+          {/* 1. 루트(/) 접속 시 홈인 /main으로 자동 이동 */}
+          <Route path="/" element={<Navigate to="/main" replace />} />
+
+          {/* 2. 실제 홈 페이지인 /main을 PrivateRoute로 감싸기 (중요!) */}
           <Route
-            path="/"
+            path="/main"
             element={
               <PrivateRoute>
                 <Main />
               </PrivateRoute>
             }
           />
+
+          {/* 3. 로그인 및 인증 페이지 */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/find-email" element={<FindEmail />} />
           <Route path="/find-password" element={<FindPassword />} />
           <Route path="/verify-code" element={<VerifyCode />} />
           <Route path="/design-system" element={<DesignSystem />} />
-          <Route path="/main" element={<Main />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+
+          {/* 4. 정의되지 않은 모든 경로는 홈(/main)으로 보냄 */}
+          <Route path="*" element={<Navigate to="/main" replace />} />
         </Routes>
       </Router>
       <ReactQueryDevtools initialIsOpen={false} />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "@/api/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1171,6 +1172,19 @@ export default function Main() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      // 서버에 로그아웃 요청 (인터셉터가 부착된 api 객체 사용)
+      await api.post("/api/auth/logout");
+    } catch (error) {
+      console.error("로그아웃 중 오류 발생:", error);
+    } finally {
+      // 성공하든 실패하든 클라이언트 데이터는 지웁니다.
+      localStorage.removeItem("userToken");
+      navigate("/login", { replace: true });
+    }
+  };
+
   // const handleVerify = (e) => {
   //   e.preventDefault();
   //   setVerifyError("");
@@ -1396,7 +1410,7 @@ export default function Main() {
               <User className="w-5 h-5" />
             </Button>
 
-            <Button variant="outline" onClick={() => navigate("/login")}>
+            <Button variant="outline" onClick={handleLogout}>
               로그아웃
             </Button>
           </div>

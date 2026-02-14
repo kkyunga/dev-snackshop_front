@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import api from "@/api/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,20 +11,13 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { useState, useLayoutEffect } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLogin } from "@/hooks/queries/useAuth";
 
 export default function Login() {
-  // [추가] 컴포넌트 렌더링 전 로그인 상태 체크
   const navigate = useNavigate();
-  useLayoutEffect(() => {
-    const token = localStorage.getItem("userToken");
-    if (token) {
-      // replace: true를 사용하여 히스토리에 로그인 페이지를 남기지 않음
-      navigate("/main", { replace: true });
-    }
-  }, [navigate]);
+  const token = localStorage.getItem("userToken");
 
   const [formData, setFormData] = useState({
     email: "",
@@ -33,6 +26,11 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loginAttempts, setLoginAttempts] = useState(0);
   const { mutate: login, isPending } = useLogin(setLoginAttempts, setError);
+
+  // 이미 로그인된 경우 즉시 /main으로 리다이렉트
+  if (token) {
+    return <Navigate to="/main" replace />;
+  }
 
   const handleChange = (e) => {
     setFormData({
