@@ -45,6 +45,7 @@ import {
   History,
   RotateCcw,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import ServerDetail from "./ServerDetail";
 
 function FileTree({ server }) {
@@ -1287,9 +1288,11 @@ export default function Main() {
 
       <header className="border-b shadow-sm bg-card">
         <div className="container flex items-center justify-between px-6 py-4 mx-auto">
-          <h1 className="text-4xl tracking-wider font-display text-primary">
-            SERVERHUB
-          </h1>
+          <Link to="/main" className="transition-opacity hover:opacity-80">
+            <h1 className="text-4xl tracking-wider font-display text-primary">
+              SERVERHUB
+            </h1>
+          </Link>
           <div className="flex items-center gap-4">
             <div className="text-sm text-muted-foreground">
               <span className="font-semibold text-primary">

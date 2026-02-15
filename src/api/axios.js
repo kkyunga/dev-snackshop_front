@@ -21,10 +21,18 @@ api.interceptors.response.use(
 
   async (error) => {
     const originalRequest = error.config;
+    // 💡 [수정] 인증이 필요 없는 경로는 401이 나도 재발급 로직을 타지 않음
+    const isAuthRoute =
+      originalRequest.url.includes("/api/auth/findEmail") ||
+      originalRequest.url.includes("/api/auth/login");
 
     // [A] 토큰 만료 처리 (401 Unauthorized)
     // 403(중복로그인/권한)은 여기서 처리하지 않고 그냥 에러로 던집니다.
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthRoute
+    ) {
       originalRequest._retry = true;
 
       try {
