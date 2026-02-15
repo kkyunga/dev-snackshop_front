@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/api/axios";
+import { serverList } from "@/api/server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -950,44 +951,29 @@ export default function Main() {
     },
   ]);
 
-  const [servers, setServers] = useState([
-    {
-      id: 1,
-      label: "Production Server",
-      ip: "192.168.1.100",
-      port: "22",
-      os: "Ubuntu 22.04",
-      country: "대한민국",
-      cloudService: "AWS",
-      software: ["MySQL 8.0", "Apache 2.4", "PHP 8.1", "Redis"],
-      lastIp: "192.168.0.50",
-      lastCountry: "대한민국",
-    },
-    {
-      id: 2,
-      label: "Development Server",
-      ip: "192.168.1.101",
-      port: "22",
-      os: "Windows Server 2022",
-      country: "미국",
-      cloudService: "Azure",
-      software: ["MSSQL", "IIS", ".NET Core"],
-      lastIp: "192.168.0.51",
-      lastCountry: "대한민국",
-    },
-    {
-      id: 3,
-      label: "DB Server",
-      ip: "192.168.1.102",
-      port: "3306",
-      os: "Ubuntu 20.04",
-      country: "일본",
-      cloudService: "GCP",
-      software: ["MySQL 8.0", "phpMyAdmin", "MongoDB"],
-      lastIp: "192.168.0.52",
-      lastCountry: "대한민국",
-    },
-  ]);
+  const [servers, setServers] = useState([]);
+
+  useEffect(() => {
+    const fetchServers = async () => {
+      try {
+        const res = await serverList();
+        const formatted = res.data.map((item) => ({
+          id: item.id,
+          label: item.label,
+          ip: item.ip,
+          port: String(item.port),
+          os: item.os,
+          country: item.country,
+          cloudService: item.cloudService,
+          software: item.middlewares || [],
+        }));
+        setServers(formatted);
+      } catch (error) {
+        console.error("서버 목록 조회 실패:", error);
+      }
+    };
+    fetchServers();
+  }, []);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newServer, setNewServer] = useState({
@@ -1912,7 +1898,7 @@ export default function Main() {
                 {servers.map((server) => (
                   <Card
                     key={server.id}
-                    className="transition-all duration-300 cursor-pointer hover:shadow-xl hover:-translate-y-2 hover:scale-105 hover:ring-2 hover:ring-primary/50 hover:bg-primary/5 active:scale-95"
+                    className="flex flex-col h-full transition-all duration-300 cursor-pointer hover:shadow-xl hover:-translate-y-2 hover:scale-105 hover:ring-2 hover:ring-primary/50 hover:bg-primary/5 active:scale-95"
                     onClick={() => handleServerClick(server)}
                   >
                     <CardHeader className="pb-3">
@@ -1944,7 +1930,7 @@ export default function Main() {
                       </div>
                     </CardHeader>
 
-                    <CardContent className="space-y-3">
+                    <CardContent className="flex flex-col flex-1 space-y-3">
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2 text-xs">
                           <Wifi className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1962,7 +1948,7 @@ export default function Main() {
                         <p className="text-xs font-semibold mb-1.5 text-muted-foreground">
                           설치된 소프트웨어
                         </p>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
                           {server.software.map((sw, idx) => (
                             <Badge
                               key={idx}
@@ -1975,7 +1961,10 @@ export default function Main() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-1.5">
+                    </CardContent>
+
+                    <CardFooter className="mt-auto pt-0">
+                      <div className="grid grid-cols-2 gap-1.5 w-full">
                         <Button
                           size="sm"
                           variant="outline"
@@ -1998,7 +1987,7 @@ export default function Main() {
                           삭제
                         </Button>
                       </div>
-                    </CardContent>
+                    </CardFooter>
                   </Card>
                 ))}
               </div>
