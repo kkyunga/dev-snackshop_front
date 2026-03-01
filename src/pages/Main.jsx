@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import api from "@/api/axios";
 import { useValidateKey } from "@/hooks/queries/useValidateKey";
 import { useServerAdd } from "@/hooks/queries/useServerAdd";
+import { useMiddlewareAdd } from "@/hooks/queries/useMiddlewareAdd";
 import { fetchServerSpecItems } from "@/api/serverSpec";
-import { useQuery } from "@tanstack/react-query";
+import { simpleMiddlewareList } from "@/api/middlewareList.js";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +59,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import {serverRemove} from "@/api/serverRemove.js";
 
 function FileTree({ server }) {
   const [expanded, setExpanded] = useState({
@@ -910,6 +913,7 @@ function UserProfile({ onClose, servers }) {
 
 export default function Main() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [selectedServer, setSelectedServer] = useState(null);
   const [activeServer, setActiveServer] = useState(null);
@@ -1026,21 +1030,30 @@ export default function Main() {
     password: "",
     keyFile: null,
     softwareToInstall: [
-      { name: "java", path: "/usr/lib/jvm" },
-      { name: "apache", path: "/usr/local/apache2" },
+      // { name: "java", path: "/usr/lib/jvm" },
+      // { name: "apache", path: "/usr/local/apache2" },
     ],
   });
 
-  const softwareOptions = [
-    { name: "apache", path: "/usr/local/apache2" },
-    { name: "tomcat", path: "/opt/tomcat" },
-    { name: "java", path: "/usr/lib/jvm" },
-    { name: "php", path: "/usr/local/php" },
-    { name: "mysql", path: "/var/lib/mysql" },
-    { name: "nginx", path: "/etc/nginx" },
-    { name: "nodejs", path: "/usr/local/node" },
-    { name: "python", path: "/usr/local/python" },
-  ];
+  const [softwareOptions, setSoftwareOptions] = useState([]);
+
+  useEffect(() => {
+    const fetchMiddlewareList = async () => {
+      try {
+        const data = await simpleMiddlewareList();
+        // API 응답의 name에서 버전 제거 (예: "Tomcat 10.1.18" -> "tomcat")
+        const formatted = data.middleware.map((item) => ({
+          name: item.name,
+          path: item.path,
+        }));
+        setSoftwareOptions(formatted);
+      } catch (error) {
+        console.error("미들웨어 목록 조회 실패:", error);
+      }
+    };
+
+    fetchMiddlewareList();
+  }, []);
 
   const handleSoftwareToggle = (software) => {
     setNewServer((prev) => {
@@ -1072,6 +1085,8 @@ export default function Main() {
     setShowAddForm,
     setNewServer,
   );
+
+  const { mutate: addMiddleware } = useMiddlewareAdd();
 
   const handleKeyFile = (file) => {
     if (!file) return;
@@ -1136,29 +1151,59 @@ export default function Main() {
   const handleAddServer = (e) => {
     e.preventDefault();
 
-    addServer({
-      label: newServer.label,
-      ip: newServer.ip,
-      port: newServer.port,
-      osType: newServer.osType,
-      osVersion: newServer.osVersion,
-      country: newServer.country,
-      cloudService: newServer.cloudService,
-      purpose: newServer.purpose,
-      authType: newServer.authType,
-      username: newServer.username,
-      password: newServer.password,
-      keyFile: newServer.keyFile,
-      softwareToInstall: newServer.softwareToInstall,
-    });
+    addServer(
+        {
+          label: newServer.label,
+          ip: newServer.ip,
+          port: newServer.port,
+          osType: newServer.osType,
+          osVersion: newServer.osVersion,
+          country: newServer.country,
+          cloudService: newServer.cloudService,
+          purpose: newServer.purpose,
+          authType: newServer.authType,
+          username: newServer.username,
+          password: newServer.password,
+          keyFile: newServer.keyFile,
+          softwareToInstall: newServer.softwareToInstall,
+        },
+        {
+          onSuccess: (res) => {
+            if (newServer.softwareToInstall.length > 0) {
+              const middlewares = newServer.softwareToInstall.map(
+                  (s) => s.name.split(" ")[0],
+              );
+              const mwVersion = newServer.softwareToInstall.map(
+                  (s) => s.name.split(" ")[1],
+              );
+              const installPath = newServer.softwareToInstall.map(
+                  (s) => s.path,
+              );
+
+              addMiddleware({
+                userOsInstanceId: res.id,
+                installPath,
+                mwVersion,
+                middlewares,
+              });
+            }
+          },
+        },
+    );
   };
 
-  const handleDeleteServer = (id) => {
+  const handleDeleteServer = async (id) => {
     if (confirm("정말 이 서버를 삭제하시겠습니까?")) {
-      setServers(servers.filter((s) => s.id !== id));
-      setSelectedServer(null);
-      if (connectedServer?.id === id) {
-        setConnectedServer(null);
+      try {
+        await serverRemove(id);
+        queryClient.invalidateQueries({ queryKey: ["servers"] });
+        setSelectedServer(null);
+        if (connectedServer?.id === id) {
+          setConnectedServer(null);
+        }
+      } catch (error) {
+        alert("서버 삭제에 실패했습니다.");
+        console.error("서버 삭제 실패:", error);
       }
     }
   };

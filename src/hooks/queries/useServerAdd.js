@@ -24,8 +24,8 @@ export const useServerAdd = (setShowAddForm, setNewServer) => {
         password: "",
         keyFile: null,
         softwareToInstall: [
-          { name: "java", path: "/usr/lib/jvm" },
-          { name: "apache", path: "/usr/local/apache2" },
+          // { name: "java", path: "/usr/lib/jvm" },
+          // { name: "apache", path: "/usr/local/apache2" },
         ],
       });
     },
