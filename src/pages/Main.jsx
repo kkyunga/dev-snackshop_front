@@ -57,7 +57,6 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import ServerDetail from "./ServerDetail";
 
 function FileTree({ server }) {
   const [expanded, setExpanded] = useState({
@@ -916,7 +915,6 @@ export default function Main() {
   const [activeServer, setActiveServer] = useState(null);
   const [connectedServer, setConnectedServer] = useState(null);
   const [connectDialogServer, setConnectDialogServer] = useState(null);
-  const [detailViewServer, setDetailViewServer] = useState(null);
   const [showUserProfile, setShowUserProfile] = useState(false);
   // const [isVerified, setIsVerified] = useState(false);
   // const [verificationCode, setVerificationCode] = useState("");
@@ -960,6 +958,13 @@ export default function Main() {
   ]);
 
   const { data: servers = [], isLoading, isError } = useServerList();
+
+  useEffect(() => {
+    if (isError) {
+      localStorage.removeItem("userToken");
+      window.location.href = "/login";
+    }
+  }, [isError]);
 
   const {
     data: serverSpec,
@@ -1089,8 +1094,8 @@ export default function Main() {
   };
 
   const handleServerClick = (server) => {
-    if (connectedServer || detailViewServer) return;
-    setDetailViewServer(server);
+    if (connectedServer) return;
+    navigate(`/server/${server.id}`);
   };
 
   const handleEditServer = (server, e) => {
@@ -1179,14 +1184,6 @@ export default function Main() {
     );
   }
 
-  if (detailViewServer) {
-    return (
-      <ServerDetail
-        server={detailViewServer}
-        onClose={() => setDetailViewServer(null)}
-      />
-    );
-  }
 
   return (
     <div className="relative flex flex-col min-h-screen bg-background">

@@ -14,6 +14,7 @@ import VerifyCode from "@/pages/VerifyCode";
 import DesignSystem from "@/pages/DesignSystem";
 import PrivateRoute from "@/pages/PrivateRoute";
 import Main from "@/pages/Main";
+import ServerDetail from "@/pages/ServerDetail";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
@@ -44,7 +45,17 @@ function App() {
             }
           />
 
-          {/* 3. 로그인 및 인증 페이지 */}
+          {/* 3. 서버 상세 페이지 */}
+          <Route
+            path="/server/:id"
+            element={
+              <PrivateRoute>
+                <ServerDetail />
+              </PrivateRoute>
+            }
+          />
+
+          {/* 4. 로그인 및 인증 페이지 */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/find-email" element={<FindEmail />} />
@@ -53,7 +64,7 @@ function App() {
           <Route path="/verify-code" element={<VerifyCode />} />
           <Route path="/design-system" element={<DesignSystem />} />
 
-          {/* 4. 정의되지 않은 모든 경로는 홈(/main)으로 보냄 */}
+          {/* 5. 정의되지 않은 모든 경로는 홈(/main)으로 보냄 */}
           <Route path="*" element={<Navigate to="/main" replace />} />
         </Routes>
       </Router>
