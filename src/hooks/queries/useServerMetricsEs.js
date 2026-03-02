@@ -19,6 +19,8 @@ const fetchCpuMetrics = async () => {
     diskUsedGb: item.diskUsedGb ?? 0,
     diskTotalGb: item.diskTotalGb ?? 0,
     diskPercentage: item.diskPercentage ?? 0,
+    networkRxKb: item.networkRxKb ?? null,
+    networkTxKb: item.networkTxKb ?? null,
   }));
 };
 

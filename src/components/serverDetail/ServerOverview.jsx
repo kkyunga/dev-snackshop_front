@@ -23,13 +23,78 @@ import ReactApexChart from "react-apexcharts";
 import { useServerMetricsEs } from "@/hooks/queries/useServerMetricsEs";
 
 export default function ServerOverview({ server }) {
-  const hardwareInfo = server?.hardwareInfo ?? null;
   const memoryData = server?.memoryHistory ?? [];
   const logData = server?.logStats ?? [];
   const schedules = server?.schedules ?? [];
 
   const { data: metricsHistory = [] } = useServerMetricsEs();
   const latestMetric = metricsHistory[metricsHistory.length - 1] ?? null;
+
+  const memorySeries = [
+    {
+      name: "메모리 사용률",
+      data: metricsHistory.map((m) => ({ x: m.x, y: m.memoryPercentage })),
+    },
+  ];
+
+  const memoryChartOptions = {
+    chart: {
+      type: "area",
+      height: 220,
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      background: "transparent",
+      animations: {
+        enabled: true,
+        easing: "easeinout",
+        speed: 700,
+        dynamicAnimation: { enabled: true, speed: 500 },
+      },
+    },
+    dataLabels: { enabled: false },
+    stroke: { curve: "smooth", width: 2 },
+    fill: {
+      type: "gradient",
+      gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.0, stops: [0, 100] },
+    },
+    colors: ["#818cf8"],
+    markers: { size: 0, hover: { size: 5 }, colors: ["#818cf8"], strokeColors: "#0f0f1a", strokeWidth: 2 },
+    xaxis: {
+      type: "datetime",
+      labels: { datetimeUTC: false, format: "HH:mm", style: { fontSize: "11px", colors: "#334155", fontFamily: "monospace" } },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
+    yaxis: {
+      min: 0,
+      max: 100,
+      tickAmount: 4,
+      labels: { formatter: (val) => `${val.toFixed(0)}%`, style: { fontSize: "11px", colors: ["#334155"], fontFamily: "monospace" } },
+    },
+    tooltip: {
+      theme: "dark",
+      x: { format: "HH:mm:ss" },
+      y: { formatter: (val) => `${val.toFixed(1)}%` },
+      marker: { show: true },
+      style: { fontFamily: "monospace", fontSize: "12px" },
+    },
+    grid: { borderColor: "#0f0f1a", strokeDashArray: 3, xaxis: { lines: { show: false } }, yaxis: { lines: { show: true } } },
+    annotations: {
+      yaxis: [
+        {
+          y: 90,
+          borderColor: "#ff4444",
+          borderWidth: 1,
+          strokeDashArray: 5,
+          label: {
+            text: "CRITICAL",
+            position: "right",
+            style: { color: "#ff4444", background: "transparent", fontSize: "10px", fontFamily: "monospace" },
+          },
+        },
+      ],
+    },
+  };
 
   const cpuSeries = [
     {
@@ -41,35 +106,89 @@ export default function ServerOverview({ server }) {
   const cpuChartOptions = {
     chart: {
       type: "area",
-      height: 250,
+      height: 220,
       toolbar: { show: false },
-      animations: { enabled: true, speed: 500 },
+      zoom: { enabled: false },
       background: "transparent",
+      sparkline: { enabled: false },
+      animations: {
+        enabled: true,
+        easing: "easeinout",
+        speed: 700,
+        dynamicAnimation: { enabled: true, speed: 500 },
+      },
     },
+    dataLabels: { enabled: false },
     stroke: { curve: "smooth", width: 2 },
     fill: {
       type: "gradient",
-      gradient: { opacityFrom: 0.4, opacityTo: 0.0 },
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.3,
+        opacityTo: 0.0,
+        stops: [0, 100],
+      },
     },
-    colors: ["#16a34a"],
+    colors: ["#00cc33"],
+    markers: {
+      size: 0,
+      hover: { size: 5 },
+      colors: ["#00cc33"],
+      strokeColors: "#000000",
+      strokeWidth: 2,
+    },
     xaxis: {
       type: "datetime",
       labels: {
         datetimeUTC: false,
-        format: "HH:mm:ss",
-        style: { fontSize: "11px" },
+        format: "HH:mm",
+        style: { fontSize: "11px", colors: "#1a6b2a", fontFamily: "monospace" },
       },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
     },
     yaxis: {
       min: 0,
-      labels: { formatter: (val) => `${val.toFixed(1)}%` },
+      tickAmount: 4,
+      labels: {
+        formatter: (val) => `${val.toFixed(0)}%`,
+        style: { fontSize: "11px", colors: ["#1a6b2a"], fontFamily: "monospace" },
+      },
     },
     tooltip: {
+      theme: "dark",
       x: { format: "HH:mm:ss" },
-      y: { formatter: (val) => `${val.toFixed(1)}%` },
+      y: { formatter: (val) => `${val.toFixed(2)}%` },
+      marker: { show: true },
+      style: { fontFamily: "monospace", fontSize: "12px" },
     },
-    grid: { borderColor: "hsl(var(--border))" },
-    theme: { mode: "light" },
+    grid: {
+      borderColor: "#0a2a10",
+      strokeDashArray: 3,
+      xaxis: { lines: { show: false } },
+      yaxis: { lines: { show: true } },
+      padding: { left: 0, right: 0 },
+    },
+    annotations: {
+      yaxis: [
+        {
+          y: 80,
+          borderColor: "#ff4444",
+          borderWidth: 1,
+          strokeDashArray: 5,
+          label: {
+            text: "CRITICAL",
+            position: "right",
+            style: {
+              color: "#ff4444",
+              background: "transparent",
+              fontSize: "10px",
+              fontFamily: "monospace",
+            },
+          },
+        },
+      ],
+    },
   };
 
   return (
@@ -217,98 +336,86 @@ export default function ServerOverview({ server }) {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  네트워크
+                  네트워크 트래픽
                 </CardTitle>
                 <Activity className="w-4 h-4 text-primary" />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    다운로드
-                  </p>
-                  <p className="text-xl font-bold">
-                    {hardwareInfo?.network.rx ?? "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">업로드</p>
-                  <p className="text-xl font-bold">
-                    {hardwareInfo?.network.tx ?? "-"}
-                  </p>
-                </div>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">↓ 수신 (Download)</p>
+                <p className="text-3xl font-bold text-blue-500">
+                  {latestMetric?.networkRxKb != null ? latestMetric.networkRxKb : "-"}
+                  <span className="text-sm font-normal text-muted-foreground ml-1">KB/s</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">↑ 송신 (Upload)</p>
+                <p className="text-3xl font-bold text-orange-500">
+                  {latestMetric?.networkTxKb != null ? latestMetric.networkTxKb : "-"}
+                  <span className="text-sm font-normal text-muted-foreground ml-1">KB/s</span>
+                </p>
               </div>
             </CardContent>
           </Card>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>CPU 사용률 추이</CardTitle>
+          <Card className="bg-black border-[#0a2a10]">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#00cc33] animate-pulse" />
+                  <CardTitle className="text-sm font-mono text-[#00cc33]">CPU 사용률 추이</CardTitle>
+                </div>
+                <span className="text-2xl font-bold font-mono text-[#00cc33]">
+                  {latestMetric?.cpuUsage?.toFixed(1) ?? "0"}%
+                </span>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               {metricsHistory.length > 0 ? (
                 <ReactApexChart
                   key={metricsHistory.length}
                   type="area"
-                  height={250}
+                  height={220}
                   series={cpuSeries}
                   options={cpuChartOptions}
                 />
               ) : (
-                <div className="flex items-center justify-center h-[250px] text-sm text-muted-foreground">
-                  데이터 로딩 중...
+                <div className="flex items-center justify-center h-[220px] text-sm font-mono text-[#1a6b2a]">
+                  $ loading metrics...
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>메모리 사용률 추이</CardTitle>
+          <Card className="bg-[#0f0f1a] border-[#1a1a2e]">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                  <CardTitle className="text-sm font-mono text-indigo-400">메모리 사용률 추이</CardTitle>
+                </div>
+                <span className="text-2xl font-bold font-mono text-indigo-400">
+                  {latestMetric?.memoryPercentage?.toFixed(1) ?? "0"}%
+                </span>
+              </div>
             </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={memoryData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--border))"
-                  />
-                  <XAxis
-                    dataKey="time"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <YAxis
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="used"
-                    stroke="hsl(142 76% 36%)"
-                    strokeWidth={2}
-                    name="사용중"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="free"
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeWidth={2}
-                    name="여유"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <CardContent className="pt-0">
+              {metricsHistory.length > 0 ? (
+                <ReactApexChart
+                  key={`mem-${metricsHistory.length}`}
+                  type="area"
+                  height={220}
+                  series={memorySeries}
+                  options={memoryChartOptions}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[220px] text-sm font-mono text-indigo-900">
+                  $ loading metrics...
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
