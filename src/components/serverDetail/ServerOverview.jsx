@@ -10,8 +10,6 @@ import {
 import {
   LineChart,
   Line,
-  AreaChart,
-  Area,
   BarChart,
   Bar,
   XAxis,
@@ -21,12 +19,58 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import ReactApexChart from "react-apexcharts";
+import { useServerMetricsEs } from "@/hooks/queries/useServerMetricsEs";
+
 export default function ServerOverview({ server }) {
   const hardwareInfo = server?.hardwareInfo ?? null;
-  const cpuData = server?.cpuHistory ?? [];
   const memoryData = server?.memoryHistory ?? [];
   const logData = server?.logStats ?? [];
   const schedules = server?.schedules ?? [];
+
+  const { data: metricsHistory = [] } = useServerMetricsEs();
+  const latestMetric = metricsHistory[metricsHistory.length - 1] ?? null;
+
+  const cpuSeries = [
+    {
+      name: "CPU 사용률",
+      data: metricsHistory.map((m) => ({ x: m.x, y: m.cpuUsage })),
+    },
+  ];
+
+  const cpuChartOptions = {
+    chart: {
+      type: "area",
+      height: 250,
+      toolbar: { show: false },
+      animations: { enabled: true, speed: 500 },
+      background: "transparent",
+    },
+    stroke: { curve: "smooth", width: 2 },
+    fill: {
+      type: "gradient",
+      gradient: { opacityFrom: 0.4, opacityTo: 0.0 },
+    },
+    colors: ["#16a34a"],
+    xaxis: {
+      type: "datetime",
+      labels: {
+        datetimeUTC: false,
+        format: "HH:mm:ss",
+        style: { fontSize: "11px" },
+      },
+    },
+    yaxis: {
+      min: 0,
+      labels: { formatter: (val) => `${val.toFixed(1)}%` },
+    },
+    tooltip: {
+      x: { format: "HH:mm:ss" },
+      y: { formatter: (val) => `${val.toFixed(1)}%` },
+    },
+    grid: { borderColor: "hsl(var(--border))" },
+    theme: { mode: "light" },
+  };
 
   return (
     <div className="h-full overflow-y-auto">
@@ -104,16 +148,16 @@ export default function ServerOverview({ server }) {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {hardwareInfo?.cpu.usage ?? "-"}%
+                {latestMetric?.cpuUsage?.toFixed(1) ?? "-"}%
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {hardwareInfo?.cpu.cores ?? "-"} Cores /{" "}
-                {hardwareInfo?.cpu.threads ?? "-"} Threads
+                {latestMetric?.cpuCores ?? "-"} Cores /{" "}
+                {latestMetric?.cpuThreads ?? "-"} Threads
               </p>
               <div className="h-2 mt-3 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full transition-all bg-primary"
-                  style={{ width: `${hardwareInfo?.cpu.usage ?? 0}%` }}
+                  style={{ width: `${latestMetric?.cpuUsage ?? 0}%` }}
                 />
               </div>
             </CardContent>
@@ -130,16 +174,15 @@ export default function ServerOverview({ server }) {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {hardwareInfo?.memory.used ?? "-"}GB
+                {latestMetric?.memoryUsed ?? "-"}MB
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                / {hardwareInfo?.memory.total ?? "-"}GB (
-                {hardwareInfo?.memory.percentage ?? "-"}%)
+                / {latestMetric?.memoryTotal ?? "-"}MB ({latestMetric?.memoryPercentage?.toFixed(1) ?? "-"}%)
               </p>
               <div className="h-2 mt-3 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full transition-all bg-primary"
-                  style={{ width: `${hardwareInfo?.memory.percentage ?? 0}%` }}
+                  style={{ width: `${latestMetric?.memoryPercentage ?? 0}%` }}
                 />
               </div>
             </CardContent>
@@ -156,16 +199,15 @@ export default function ServerOverview({ server }) {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">
-                {hardwareInfo?.disk.used ?? "-"}GB
+                {latestMetric?.diskUsed ?? "-"}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                / {hardwareInfo?.disk.total ?? "-"}GB (
-                {hardwareInfo?.disk.percentage ?? "-"}%)
+                / {latestMetric?.diskTotal ?? "-"} ({latestMetric?.diskPercentage?.toFixed(1) ?? "-"}%)
               </p>
               <div className="h-2 mt-3 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full transition-all bg-primary"
-                  style={{ width: `${hardwareInfo?.disk.percentage ?? 0}%` }}
+                  style={{ width: `${latestMetric?.diskPercentage ?? 0}%` }}
                 />
               </div>
             </CardContent>
@@ -207,58 +249,19 @@ export default function ServerOverview({ server }) {
               <CardTitle>CPU 사용률 추이</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={cpuData}>
-                  <defs>
-                    <linearGradient
-                      id="colorUsage"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop
-                        offset="5%"
-                        stopColor="hsl(142 76% 36%)"
-                        stopOpacity={0.3}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="hsl(142 76% 36%)"
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--border))"
-                  />
-                  <XAxis
-                    dataKey="time"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <YAxis
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="usage"
-                    stroke="hsl(142 76% 36%)"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorUsage)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {metricsHistory.length > 0 ? (
+                <ReactApexChart
+                  key={metricsHistory.length}
+                  type="area"
+                  height={250}
+                  series={cpuSeries}
+                  options={cpuChartOptions}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[250px] text-sm text-muted-foreground">
+                  데이터 로딩 중...
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -6,7 +6,8 @@
       "Bash(timeout /t 3)",
       "Bash(npm uninstall:*)",
       "Bash(ping:*)",
-      "Bash(npx shadcn@latest add:*)"
+      "Bash(npx shadcn@latest add:*)",
+      "WebFetch(domain:40.82.146.221)"
     ]
   }
 }
