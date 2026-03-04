@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerList } from "@/hooks/queries/useServerList";
+import { useServerDetail } from "@/hooks/queries/useServerDetail";
 import {
   Card,
   CardHeader,
@@ -930,6 +931,31 @@ export default function Main() {
     keyFile: null,
   });
 
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingServerId, setEditingServerId] = useState(null);
+
+  const { data: serverDetail } = useServerDetail(editingServerId);
+
+  useEffect(() => {
+    if (serverDetail) {
+      setNewServer({
+        id: serverDetail.id,
+        label: serverDetail.label || "",
+        ip: serverDetail.ip || "",
+        port: serverDetail.port || "",
+        osType: serverDetail.osType || "",
+        osVersion: serverDetail.osVersion || "",
+        country: serverDetail.country || "",
+        cloudService: serverDetail.cloudService || "",
+        purpose: serverDetail.purpose || "",
+        authType: serverDetail.authType || "",
+        username: serverDetail.username || "",
+        password: "",
+        keyFile: null,
+        softwareToInstall: [],
+      });
+    }
+  }, [serverDetail]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
     {
@@ -972,8 +998,6 @@ export default function Main() {
 
   const {
     data: serverSpec,
-    isLoading: specLoading,
-    error: specError,
   } = useQuery({
     queryKey: ["serverSpec"],
     queryFn: fetchServerSpecItems,
@@ -1113,26 +1137,10 @@ export default function Main() {
     navigate(`/server/${server.id}`);
   };
 
-  const handleEditServer = (server, e) => {
-    e.stopPropagation();
-    const newLabel = prompt("서버 이름 변경:", server.label);
-    if (newLabel && newLabel.trim()) {
-      setServers(
-        servers.map((s) =>
-          s.id === server.id ? { ...s, label: newLabel.trim() } : s,
-        ),
-      );
-    }
-  };
-
-  const handleConnect = (server) => {
-    setConnectDialogServer(server);
-    setConnectAuth({
-      type: "password",
-      username: "",
-      password: "",
-      keyFile: null,
-    });
+  const handleEditServer = (server) => {
+    setEditingServerId(server.id);
+    setIsEditMode(true);
+    setShowAddForm(true);
   };
 
   const handleConnectSubmit = (e) => {
@@ -1513,7 +1521,11 @@ export default function Main() {
                   </p>
                 </div>
                 <Button
-                  onClick={() => setShowAddForm(!showAddForm)}
+                    onClick={() => {
+                      setShowAddForm(!showAddForm);
+                      setIsEditMode(false);
+                      setEditingServerId(null);
+                    }}
                   variant={showAddForm ? "secondary" : "default"}
                   size="lg"
                 >
@@ -1525,7 +1537,7 @@ export default function Main() {
               {showAddForm && (
                 <Card className="shadow-lg border-primary/20">
                   <CardHeader className="bg-primary/5">
-                    <CardTitle>새 서버 추가</CardTitle>
+                    <CardTitle>{isEditMode ? "서버 수정" : "새 서버 추가"}</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
                     <form onSubmit={handleAddServer} className="space-y-6">
@@ -1810,62 +1822,62 @@ export default function Main() {
                         </div>
                       </div>
 
-                      {/* 소프트웨어 설치 섹션 */}
-                      <div className="p-5 border-2 border-purple-200 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50">
-                        <h3 className="flex items-center gap-2 mb-4 text-lg font-bold text-purple-900">
-                          <Package className="w-5 h-5" />
-                          소프트웨어 설치
-                        </h3>
-                        <div className="space-y-3">
-                          <Label>설치할 소프트웨어 (선택)</Label>
-                          <div className="grid grid-cols-2 gap-3 p-4 border rounded-lg bg-muted/20">
-                            {softwareOptions.map((software) => {
-                              const isSelected =
-                                newServer.softwareToInstall.some(
-                                  (s) => s.name === software.name,
-                                );
-                              return (
-                                <div
-                                  key={software.name}
-                                  className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                                    isSelected
-                                      ? "border-primary bg-primary/10"
-                                      : "border-border hover:border-primary/50"
-                                  }`}
-                                  onClick={() => handleSoftwareToggle(software)}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <div
-                                      className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                                        isSelected
-                                          ? "bg-primary border-primary"
-                                          : "border-muted-foreground"
-                                      }`}
-                                    >
-                                      {isSelected && (
-                                        <div className="w-2 h-2 bg-white rounded-sm" />
-                                      )}
-                                    </div>
-                                    <span className="text-sm font-medium">
-                                      {software.name}
-                                    </span>
-                                  </div>
-                                  {isSelected && (
-                                    <p className="mt-1 ml-6 text-xs text-muted-foreground">
-                                      설치 경로: {software.path}
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })}
+                      {/* 소프트웨어 설치 섹션 - 수정 모드에서는 표시 안 함 */}
+                      {!isEditMode && (
+                          <div className="p-5 border-2 border-purple-200 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50">
+                            <h3 className="flex items-center gap-2 mb-4 text-lg font-bold text-purple-900">
+                              <Package className="w-5 h-5" />
+                              소프트웨어 설치
+                            </h3>
+                            <div className="space-y-3">
+                              <Label>설치할 소프트웨어 (선택)</Label>
+                              <div className="grid grid-cols-2 gap-3 p-4 border rounded-lg bg-muted/20">
+                                {softwareOptions.map((software) => {
+                                  const isSelected = newServer.softwareToInstall.some(
+                                      (s) => s.name === software.name,
+                                  );
+                                  return (
+                                      <div
+                                          key={software.name}
+                                          className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                                              isSelected
+                                                  ? "border-primary bg-primary/10"
+                                                  : "border-border hover:border-primary/50"
+                                          }`}
+                                          onClick={() => handleSoftwareToggle(software)}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <div
+                                              className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                                                  isSelected
+                                                      ? "bg-primary border-primary"
+                                                      : "border-muted-foreground"
+                                              }`}
+                                          >
+                                            {isSelected && (
+                                                <div className="w-2 h-2 bg-white rounded-sm" />
+                                            )}
+                                          </div>
+                                          <span className="text-sm font-medium">{software.name}</span>
+                                        </div>
+                                        {isSelected && (
+                                            <p className="mt-1 ml-6 text-xs text-muted-foreground">
+                                              설치 경로: {software.path}
+                                            </p>
+                                        )}
+                                      </div>
+                                  );
+                                })}
+                              </div>
+                              {newServer.softwareToInstall.length === 0 && (
+                                  <p className="text-sm italic text-muted-foreground">
+                                    선택하지 않으면 기본 OS만 설치됩니다
+                                  </p>
+                              )}
+                            </div>
                           </div>
-                          {newServer.softwareToInstall.length === 0 && (
-                            <p className="text-sm italic text-muted-foreground">
-                              선택하지 않으면 기본 OS만 설치됩니다
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                      )}
+
 
                       {/* 제출 버튼 */}
                       <Button
@@ -1973,10 +1985,14 @@ export default function Main() {
                     <CardFooter className="pt-0 mt-auto">
                       <div className="grid grid-cols-2 gap-1.5 w-full">
                         <Button
-                          size="sm"
-                          variant="outline"
-                          className="col-span-1"
-                          onClick={(e) => handleEditServer(server, e)}
+                            size="sm"
+                            variant="outline"
+                            className="col-span-1"
+                            onClick={(e) => {
+                              e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
+                              handleEditServer(server); // 수정할 서버 데이터 전달
+                              setShowAddForm(true);    // "새 서버 추가" 폼 열기
+                            }}
                         >
                           <Edit className="w-3 h-3 mr-1" />
                           수정
