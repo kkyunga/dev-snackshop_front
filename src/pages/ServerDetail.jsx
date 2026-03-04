@@ -261,7 +261,7 @@ export default function ServerDetail() {
 
       <div className="flex-1 overflow-hidden">
         {activeTab === "overview" ? (
-          <ServerOverview server={s} />
+          <ServerOverview server={s} serverId={id} />
         ) : activeTab === "terminal" ? (
           <div className="h-full overflow-y-auto">
             <div className="container h-full p-6 mx-auto">
