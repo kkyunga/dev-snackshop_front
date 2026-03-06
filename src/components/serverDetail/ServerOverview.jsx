@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,6 +24,7 @@ import {
 import ReactApexChart from "react-apexcharts";
 import { useServerMetricsEs } from "@/hooks/queries/useServerMetricsEs";
 import { useServerLogAnalyze } from "@/hooks/queries/useServerLogAnalyze";
+import { useServerLogAnalyzeHistory } from "@/hooks/queries/useServerLogAnalyzeHistory";
 
 const LOG_SECTIONS = [
   { key: "syslog",  label: "Syslog" },
@@ -93,14 +94,50 @@ const getSectionBadgeCount = (key, data) => {
   }
 };
 
+const getTimeAgo = (collectedAt) => {
+  if (!collectedAt) return "";
+  // LocalDateTime from backend has no timezone → treat as KST (UTC+9)
+  const dateStr = /[Z+]/.test(collectedAt) ? collectedAt : `${collectedAt}+09:00`;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "방금 전";
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}시간 전`;
+};
+
 export default function ServerOverview({ server, serverId }) {
   const [selectedLogType, setSelectedLogType] = useState("syslog");
+  const [logHistory, setLogHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
   const schedules = server?.schedules ?? [];
 
-  const { data: metricsHistory = [] } = useServerMetricsEs();
-  const { data: logAnalyze }          = useServerLogAnalyze(serverId);
+  const { data: metricsHistory = [] }   = useServerMetricsEs();
+  const { data: logAnalyze }            = useServerLogAnalyze(serverId);
+  const { data: logAnalyzeHistory = [] } = useServerLogAnalyzeHistory(serverId);
   const latestMetric = metricsHistory[metricsHistory.length - 1] ?? null;
+
+  // 최초 로드 시 백엔드 히스토리로 초기화
+  useEffect(() => {
+    if (!logAnalyzeHistory.length) return;
+    setLogHistory((prev) => {
+      if (prev.length > 0) return prev; // 이미 세션 데이터 있으면 유지
+      return logAnalyzeHistory;
+    });
+  }, [logAnalyzeHistory]);
+
+  // 새 데이터 폴링 시 앞에 추가
+  useEffect(() => {
+    if (!logAnalyze?.collectedAt) return;
+    setLogHistory((prev) => {
+      if (prev.length > 0 && prev[0].collectedAt === logAnalyze.collectedAt) return prev;
+      return [logAnalyze, ...prev].slice(0, 20);
+    });
+    setHistoryIndex(0);
+  }, [logAnalyze?.collectedAt]);
+
+  const displayLog = logHistory[historyIndex] ?? logAnalyze;
 
   const memorySeries = [
     {
@@ -178,7 +215,7 @@ export default function ServerOverview({ server, serverId }) {
     },
   };
 
-  const sectionData  = getSectionData(logAnalyze, selectedLogType);
+  const sectionData  = getSectionData(displayLog, selectedLogType);
   const chartBars    = CHART_CONFIG[selectedLogType] ?? [];
   const chartData    = chartBars.map((b) => ({ name: b.name, value: sectionData?.[b.key] ?? 0, fill: b.fill }));
   const hasChartData = chartData.some((d) => d.value > 0);
@@ -342,23 +379,50 @@ export default function ServerOverview({ server, serverId }) {
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-primary" />
                   <CardTitle>로그 분석</CardTitle>
-                  {logAnalyze?.system && (
+                  {displayLog?.system && (
                     <span className="text-xs font-mono text-muted-foreground">
-                      {logAnalyze.system.osType} {logAnalyze.system.osVersion}
+                      {displayLog.system.osType} {displayLog.system.osVersion}
                     </span>
                   )}
                 </div>
-                {logAnalyze?.collectedAt && (
-                  <span className="text-xs text-muted-foreground">
-                    수집: {new Date(logAnalyze.collectedAt).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {/* 과거 탐색 네비게이션 */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      disabled={historyIndex >= logHistory.length - 1}
+                      onClick={() => setHistoryIndex((i) => i + 1)}
+                      className="px-2 py-0.5 text-xs rounded border bg-muted hover:bg-muted/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ← 이전
+                    </button>
+                    <span className="text-xs font-mono text-muted-foreground min-w-[70px] text-center">
+                      {logHistory.length === 0
+                        ? "로딩 중"
+                        : historyIndex === 0
+                          ? `최신 (1/${logHistory.length})`
+                          : `${historyIndex + 1}/${logHistory.length} · ${getTimeAgo(displayLog?.collectedAt)}`
+                      }
+                    </span>
+                    <button
+                      disabled={historyIndex <= 0}
+                      onClick={() => setHistoryIndex((i) => i - 1)}
+                      className="px-2 py-0.5 text-xs rounded border bg-muted hover:bg-muted/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      다음 →
+                    </button>
+                  </div>
+                  {displayLog?.collectedAt && (
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(displayLog.collectedAt).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* 섹션 탭 */}
               <div className="flex flex-wrap gap-1.5">
                 {LOG_SECTIONS.map((s) => {
-                  const secData = getSectionData(logAnalyze, s.key);
+                  const secData = getSectionData(displayLog, s.key);
                   const count = getSectionBadgeCount(s.key, secData);
                   const isActive = selectedLogType === s.key;
                   const isError = s.key !== "package" && count > 0;
@@ -393,7 +457,7 @@ export default function ServerOverview({ server, serverId }) {
           </CardHeader>
 
           <CardContent>
-            {logAnalyze ? (
+            {displayLog ? (
               <div className="space-y-4">
                 {/* 수치 요약 카드 */}
                 <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${chartBars.length}, minmax(0, 1fr))` }}>
