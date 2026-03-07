@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Cpu,
   HardDrive,
@@ -10,6 +19,9 @@ import {
   FileText,
   ShieldAlert,
   CheckCircle2,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   BarChart,
@@ -25,6 +37,13 @@ import ReactApexChart from "react-apexcharts";
 import { useServerMetricsEs } from "@/hooks/queries/useServerMetricsEs";
 import { useServerLogAnalyze } from "@/hooks/queries/useServerLogAnalyze";
 import { useServerLogAnalyzeRecent } from "@/hooks/queries/useServerLogAnalyzeRecent";
+import {
+  useInspectSchedules,
+  useCreateSchedule,
+  useUpdateSchedule,
+  usePatchScheduleStatus,
+  useDeleteSchedule,
+} from "@/hooks/queries/useInspectSchedule";
 
 const LOG_SECTIONS = [
   { key: "syslog", label: "Syslog" },
@@ -188,11 +207,69 @@ const buildTimeSeriesData = (rangeKey, records, chartBars, sectionKey) => {
   });
 };
 
+const STATUS_META = {
+  UPCOMING:    { label: "예정",   className: "bg-blue-500/15 text-blue-500 border-blue-500/30" },
+  IN_PROGRESS: { label: "진행중", className: "bg-orange-500/15 text-orange-500 border-orange-500/30" },
+  DONE:        { label: "완료",   className: "bg-green-500/15 text-green-600 border-green-500/30" },
+};
+
+const EMPTY_FORM = { title: "", description: "", startAt: "", endAt: "" };
+
+function toDatetimeLocal(isoStr) {
+  if (!isoStr) return "";
+  const d = /[Z+]/.test(isoStr) ? isoStr : `${isoStr}Z`;
+  const local = new Date(d);
+  return new Date(local.getTime() - local.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+function fromDatetimeLocal(localStr) {
+  if (!localStr) return null;
+  return new Date(localStr).toISOString().replace("Z", "");
+}
+
 export default function ServerOverview({ server, serverId }) {
   const [selectedLogType, setSelectedLogType] = useState("syslog");
   const [selectedRange, setSelectedRange] = useState("live");
 
-  const schedules = server?.schedules ?? [];
+  // ── 정기 점검 state ──
+  const [scheduleModal, setScheduleModal] = useState(false);
+  const [editTarget, setEditTarget] = useState(null); // null = create, object = edit
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const { data: schedules = [] } = useInspectSchedules(serverId);
+  const createMut  = useCreateSchedule(serverId);
+  const updateMut  = useUpdateSchedule(serverId);
+  const statusMut  = usePatchScheduleStatus(serverId);
+  const deleteMut  = useDeleteSchedule(serverId);
+
+  const openCreate = () => { setEditTarget(null); setForm(EMPTY_FORM); setScheduleModal(true); };
+  const openEdit   = (s)  => {
+    setEditTarget(s);
+    setForm({
+      title:       s.title ?? "",
+      description: s.description ?? "",
+      startAt:     toDatetimeLocal(s.startAt),
+      endAt:       toDatetimeLocal(s.endAt),
+    });
+    setScheduleModal(true);
+  };
+
+  const handleSubmit = () => {
+    const payload = {
+      serverId,
+      title:       form.title,
+      description: form.description || null,
+      startAt:     fromDatetimeLocal(form.startAt),
+      endAt:       fromDatetimeLocal(form.endAt),
+    };
+    if (editTarget) {
+      updateMut.mutate({ id: editTarget.id, body: payload }, { onSuccess: () => setScheduleModal(false) });
+    } else {
+      createMut.mutate(payload, { onSuccess: () => setScheduleModal(false) });
+    }
+  };
 
   const isLive = selectedRange === "live";
   const rangeMinutes =
@@ -960,33 +1037,171 @@ export default function ServerOverview({ server, serverId }) {
 
         {/* ── 정기 점검 일정 ── */}
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle>정기 점검 일정</CardTitle>
-              <Calendar className="w-5 h-5 text-primary" />
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-primary" />
+                <CardTitle>정기 점검 일정</CardTitle>
+              </div>
+              <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" onClick={openCreate}>
+                <Plus className="w-3 h-3" />
+                일정 추가
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {schedules.map((schedule) => (
-                <div
-                  key={schedule.id}
-                  className="flex items-start gap-3 p-3 transition-colors border rounded-lg hover:bg-accent/50"
-                >
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{schedule.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {schedule.date} {schedule.time}
-                    </p>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {schedule.type === "backup" ? "백업" : "유지보수"}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+            {schedules.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                <Calendar className="w-8 h-8 mb-2 opacity-30" />
+                <p className="text-sm">등록된 점검 일정이 없습니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {schedules.map((s) => {
+                  const meta = STATUS_META[s.status] ?? STATUS_META.UPCOMING;
+                  const fmtDate = (iso) => {
+                    if (!iso) return "-";
+                    const d = /[Z+]/.test(iso) ? iso : `${iso}Z`;
+                    return new Date(d).toLocaleString("ko-KR", {
+                      month: "2-digit", day: "2-digit",
+                      hour: "2-digit", minute: "2-digit",
+                    });
+                  };
+                  return (
+                    <div key={s.id} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-accent/50 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium truncate">{s.title}</p>
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${meta.className}`}>
+                            {meta.label}
+                          </Badge>
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground font-mono">
+                          {fmtDate(s.startAt)} ~ {fmtDate(s.endAt)}
+                        </p>
+                        {s.description && (
+                          <p className="mt-1 text-xs text-muted-foreground truncate">{s.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {s.status !== "DONE" && (
+                          <button
+                            onClick={() => statusMut.mutate({ id: s.id, status: "DONE" })}
+                            className="text-[10px] px-2 py-0.5 rounded border border-border hover:bg-muted transition-colors text-muted-foreground"
+                          >
+                            완료설정
+                          </button>
+                        )}
+                        <button onClick={() => openEdit(s)} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { if (confirm("일정을 삭제하시겠습니까?")) deleteMut.mutate(s.id); }}
+                          className="p-1.5 rounded hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-500"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* ── 점검 일정 모달 ── */}
+        <Dialog open={scheduleModal} onOpenChange={setScheduleModal}>
+          <DialogContent className="sm:max-w-lg p-0 overflow-hidden" onClose={() => setScheduleModal(false)}>
+            {/* 헤더 */}
+            <div className="flex items-center gap-3 px-6 py-5 border-b bg-muted/30">
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
+                <Calendar className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold">
+                  {editTarget ? "점검 일정 수정" : "점검 일정 추가"}
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {editTarget ? "일정 내용을 수정합니다." : "새로운 정기 점검 일정을 등록합니다."}
+                </p>
+              </div>
+            </div>
+
+            {/* 폼 */}
+            <div className="px-6 py-5 space-y-5">
+              {/* 제목 */}
+              <div className="space-y-1.5">
+                <Label htmlFor="sch-title" className="text-sm font-medium">
+                  제목 <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="sch-title"
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="예) 월간 DB 백업 및 패치"
+                  className="h-9"
+                />
+              </div>
+
+              {/* 설명 */}
+              <div className="space-y-1.5">
+                <Label htmlFor="sch-desc" className="text-sm font-medium">
+                  설명
+                  <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">(선택)</span>
+                </Label>
+                <Input
+                  id="sch-desc"
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="점검 내용을 간략히 입력하세요"
+                  className="h-9"
+                />
+              </div>
+
+              {/* 기간 */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">
+                  점검 기간 <span className="text-red-500">*</span>
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-muted-foreground">시작</p>
+                    <Input
+                      id="sch-start"
+                      type="datetime-local"
+                      value={form.startAt}
+                      onChange={(e) => setForm((f) => ({ ...f, startAt: e.target.value }))}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-muted-foreground">종료</p>
+                    <Input
+                      id="sch-end"
+                      type="datetime-local"
+                      value={form.endAt}
+                      onChange={(e) => setForm((f) => ({ ...f, endAt: e.target.value }))}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 푸터 */}
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t bg-muted/20">
+              <Button variant="outline" className="h-9 px-4" onClick={() => setScheduleModal(false)}>취소</Button>
+              <Button
+                className="h-9 px-5"
+                onClick={handleSubmit}
+                disabled={!form.title || !form.startAt || !form.endAt || createMut.isPending || updateMut.isPending}
+              >
+                {(createMut.isPending || updateMut.isPending) ? "저장 중..." : editTarget ? "수정 완료" : "일정 추가"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

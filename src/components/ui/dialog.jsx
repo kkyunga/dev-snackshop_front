@@ -65,4 +65,12 @@ const DialogDescription = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogDescription.displayName = "DialogDescription"
 
-export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription }
+const DialogFooter = ({ className, ...props }) => (
+  <div
+    className={cn("flex justify-end gap-2 px-6 py-4 pt-0", className)}
+    {...props}
+  />
+)
+DialogFooter.displayName = "DialogFooter"
+
+export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter }
