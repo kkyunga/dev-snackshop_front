@@ -148,12 +148,45 @@ const getSectionBadgeCount = (key, data) => {
 
 const RANGES = [
   { key: "live", label: "실시간", minutes: null },
-  { key: "10m", label: "10분", minutes: 10 },
-  { key: "1h", label: "1시간", minutes: 60 },
-  { key: "3h", label: "3시간", minutes: 180 },
+  { key: "10m",  label: "10분",  minutes: 10   },
+  { key: "1h",   label: "1시간", minutes: 60   },
+  { key: "3h",   label: "3시간", minutes: 180  },
 ];
 
-// 여러 레코드의 숫자 필드를 합산해 단일 로그 객체로 만들기
+const TIME_BUCKET_CONFIG = {
+  "10m": { count: 10, stepMs: 60 * 1000,      labelFn: (i, n) => `${n - i}분 전`      },
+  "1h":  { count: 6,  stepMs: 10 * 60 * 1000, labelFn: (i, n) => `${(n - i) * 10}분 전` },
+  "3h":  { count: 3,  stepMs: 60 * 60 * 1000, labelFn: (i, n) => `${n - i}시간 전`    },
+};
+
+const buildTimeSeriesData = (rangeKey, records, chartBars, sectionKey) => {
+  const config = TIME_BUCKET_CONFIG[rangeKey];
+  if (!config) return [];
+  const now = Date.now();
+  const secKey = sectionKey === "package" ? "package" : sectionKey;
+
+  return Array.from({ length: config.count }, (_, i) => {
+    const bucketEnd   = now - (config.count - 1 - i) * config.stepMs;
+    const bucketStart = bucketEnd - config.stepMs;
+    const bucketMid   = (bucketStart + bucketEnd) / 2;
+
+    let closest = null;
+    let closestDist = Infinity;
+    for (const r of records) {
+      const ds = /[Z+]/.test(r.collectedAt) ? r.collectedAt : `${r.collectedAt}Z`;
+      const dist = Math.abs(new Date(ds).getTime() - bucketMid);
+      if (dist < closestDist) { closest = r; closestDist = dist; }
+    }
+
+    const secData = closest?.system?.[secKey] ?? null;
+    const total   = chartBars.reduce((sum, bar) => sum + (secData?.[bar.key] ?? 0), 0);
+    return {
+      name:  config.labelFn(i, config.count),
+      value: total,
+      fill:  total > 0 ? "#ef4444" : "#4ade80",
+    };
+  });
+};
 
 export default function ServerOverview({ server, serverId }) {
   const [selectedLogType, setSelectedLogType] = useState("syslog");
@@ -380,14 +413,12 @@ export default function ServerOverview({ server, serverId }) {
     },
   };
 
-  const sectionData = getSectionData(displayLog, selectedLogType);
-  const chartBars = CHART_CONFIG[selectedLogType] ?? [];
-  const chartData = chartBars.map((b) => ({
-    name: b.name,
-    value: sectionData?.[b.key] ?? 0,
-    fill: b.fill,
-  }));
-  const hasChartData = chartData.some((d) => d.value > 0);
+  const sectionData      = getSectionData(displayLog, selectedLogType);
+  const chartBars        = CHART_CONFIG[selectedLogType] ?? [];
+  const chartData        = chartBars.map((b) => ({ name: b.name, value: sectionData?.[b.key] ?? 0, fill: b.fill }));
+  const hasChartData     = chartData.some((d) => d.value > 0);
+  const timeSeriesData   = !isLive ? buildTimeSeriesData(selectedRange, recentLogs, chartBars, selectedLogType) : [];
+  const hasTimeSeriesData = timeSeriesData.some((d) => d.value > 0);
   const tableConf = TABLE_CONFIG[selectedLogType];
   const tableItems = sectionData?.[tableConf?.listKey] ?? [];
 
@@ -814,34 +845,39 @@ export default function ServerOverview({ server, serverId }) {
                 </div>
 
                 {/* 차트 or 정상 상태 */}
-                {hasChartData ? (
+                {!isLive ? (
+                  hasTimeSeriesData ? (
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={timeSeriesData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" />
+                        <YAxis fontSize={11} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" />
+                        <Tooltip
+                          cursor={{ fill: "hsl(var(--muted)/0.2)" }}
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                        />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                          {timeSeriesData.map((entry, i) => (
+                            <Cell key={i} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 py-5 border rounded-lg bg-green-500/5 border-green-500/20">
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      <span className="text-sm font-medium text-green-600">정상 — 이상 없음</span>
+                    </div>
+                  )
+                ) : hasChartData ? (
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={chartData}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="hsl(var(--border))"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="name"
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        stroke="hsl(var(--muted-foreground))"
-                      />
-                      <YAxis
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        stroke="hsl(var(--muted-foreground))"
-                      />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis fontSize={11} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip
                         cursor={{ fill: "hsl(var(--muted)/0.2)" }}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
                       />
                       <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
                         {chartData.map((entry, i) => (
@@ -853,9 +889,7 @@ export default function ServerOverview({ server, serverId }) {
                 ) : (
                   <div className="flex items-center justify-center gap-2 py-5 border rounded-lg bg-green-500/5 border-green-500/20">
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
-                    <span className="text-sm font-medium text-green-600">
-                      정상 — 이상 없음
-                    </span>
+                    <span className="text-sm font-medium text-green-600">정상 — 이상 없음</span>
                   </div>
                 )}
 
