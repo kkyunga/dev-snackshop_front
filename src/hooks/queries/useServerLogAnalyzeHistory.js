@@ -6,11 +6,11 @@ const fetchLogAnalyzeHistory = async (serverId, minutes = 60) => {
   return response.data;
 };
 
-export const useServerLogAnalyzeHistory = (serverId, minutes = 60) => {
+export const useServerLogAnalyzeHistory = (serverId, minutes = 60, enabled = true) => {
   return useQuery({
     queryKey: ["server-log-analyze-history", serverId, minutes],
     queryFn: () => fetchLogAnalyzeHistory(serverId, minutes),
-    enabled: !!serverId,
+    enabled: !!serverId && enabled,
     staleTime: 30000,
   });
 };
