@@ -1,91 +1,68 @@
 import { useState } from "react";
-import {
-  Folder,
-  FolderOpen,
-  File,
-  ChevronRight,
-  ChevronDown,
-} from "lucide-react";
+import { Folder, FolderOpen, File, ChevronRight, ChevronDown, Loader } from "lucide-react";
+import { useServerFiles } from "@/hooks/queries/useServerFiles";
 
-export default function FileTree({ server }) {
-  const [expanded, setExpanded] = useState({
-    "/": true,
-    "/home": false,
-    "/var": false,
-    "/etc": false,
-  });
+function FileNode({ name, path, type, serverId, depth = 0 }) {
+  const [expanded, setExpanded] = useState(false);
+  const isFolder = type === "directory";
 
-  const toggleFolder = (path) => {
-    setExpanded((prev) => ({ ...prev, [path]: !prev[path] }));
+  const { data: children, isLoading } = useServerFiles(
+    isFolder && expanded ? serverId : null,
+    path
+  );
+
+  const toggle = () => {
+    if (isFolder) setExpanded((v) => !v);
   };
 
-  const fileStructure = [
-    {
-      name: "home",
-      path: "/home",
-      type: "folder",
-      children: [
-        { name: "user", path: "/home/user", type: "folder" },
-        { name: "admin", path: "/home/admin", type: "folder" },
-      ],
-    },
-    {
-      name: "var",
-      path: "/var",
-      type: "folder",
-      children: [
-        { name: "log", path: "/var/log", type: "folder" },
-        { name: "www", path: "/var/www", type: "folder" },
-      ],
-    },
-    {
-      name: "etc",
-      path: "/etc",
-      type: "folder",
-      children: [
-        { name: "nginx", path: "/etc/nginx", type: "folder" },
-        { name: "apache2", path: "/etc/apache2", type: "folder" },
-        { name: "hosts", path: "/etc/hosts", type: "file" },
-      ],
-    },
-  ];
+  const Icon = isFolder ? (expanded ? FolderOpen : Folder) : File;
 
-  const renderItem = (item, depth = 0) => {
-    const isExpanded = expanded[item.path];
-    const Icon =
-      item.type === "folder" ? (isExpanded ? FolderOpen : Folder) : File;
-
-    return (
-      <div key={item.path}>
-        <div
-          className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-accent"
-          style={{ paddingLeft: `${depth * 16 + 8}px` }}
-          onClick={() => item.type === "folder" && toggleFolder(item.path)}
-        >
-          {item.type === "folder" &&
-            (isExpanded ? (
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="w-3 h-3 text-muted-foreground" />
-            ))}
-          <Icon className="w-4 h-4 text-primary" />
-          <span className="text-sm">{item.name}</span>
-        </div>
-        {item.type === "folder" && isExpanded && item.children && (
-          <div>
-            {item.children.map((child) => renderItem(child, depth + 1))}
-          </div>
+  return (
+    <div>
+      <div
+        className="flex items-center gap-1 px-2 py-1 rounded cursor-pointer hover:bg-accent"
+        style={{ paddingLeft: `${depth * 14 + 8}px` }}
+        onClick={toggle}
+      >
+        {isFolder ? (
+          expanded ? (
+            <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground" />
+          )
+        ) : (
+          <span className="w-3" />
         )}
+        {isLoading ? (
+          <Loader className="w-4 h-4 shrink-0 animate-spin text-primary" />
+        ) : (
+          <Icon className="w-4 h-4 shrink-0 text-primary" />
+        )}
+        <span className="text-sm truncate">{name}</span>
       </div>
-    );
-  };
+      {isFolder && expanded && children && (
+        <div>
+          {children.map((item) => (
+            <FileNode
+              key={item.path}
+              {...item}
+              serverId={serverId}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function FileTree({ server, serverId }) {
+  const { data: rootFiles, isLoading } = useServerFiles(serverId, "/");
 
   return (
     <div className="h-full p-2 overflow-y-auto border rounded-lg bg-card">
       <div className="pb-2 mb-2 border-b">
-        <p className="text-sm font-semibold text-muted-foreground">
-          파일 시스템
-        </p>
+        <p className="text-sm font-semibold text-muted-foreground">파일 시스템</p>
         <p className="text-xs text-muted-foreground">{server.label}</p>
       </div>
       <div>
@@ -93,7 +70,15 @@ export default function FileTree({ server }) {
           <FolderOpen className="w-4 h-4 text-primary" />
           <span className="text-sm">/</span>
         </div>
-        {fileStructure.map((item) => renderItem(item, 0))}
+        {isLoading && (
+          <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
+            <Loader className="w-3 h-3 animate-spin" />
+            로딩 중...
+          </div>
+        )}
+        {rootFiles?.map((item) => (
+          <FileNode key={item.path} {...item} serverId={serverId} depth={0} />
+        ))}
       </div>
     </div>
   );

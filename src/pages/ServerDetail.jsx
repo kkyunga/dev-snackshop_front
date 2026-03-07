@@ -12,8 +12,8 @@ import {
   User,
   Upload,
 } from "lucide-react";
-import FileTree from "@/components/serverDetail/FileTree";
 import TerminalTab from "@/components/serverDetail/TerminalTab";
+import FileTree from "@/components/serverDetail/FileTree";
 import BackupSecurity from "@/components/serverDetail/BackupSecurity";
 import ManagementDeploy from "@/components/serverDetail/ManagementDeploy";
 import MiddlewareManager from "@/components/serverDetail/MiddlewareManager";
@@ -263,18 +263,14 @@ export default function ServerDetail() {
         {activeTab === "overview" ? (
           <ServerOverview server={s} serverId={id} />
         ) : activeTab === "terminal" ? (
-          <div className="h-full overflow-y-auto">
-            <div className="container h-full p-6 mx-auto">
-              <Card className="flex flex-col h-full">
-                <CardContent className="flex-1 p-4 overflow-hidden">
-                  <div className="grid h-full grid-cols-3 gap-4">
-                    <div className="col-span-1 overflow-hidden">
-                      <FileTree server={s} />
-                    </div>
-                    <div className="col-span-2 overflow-hidden">
-                      <TerminalTab server={s} />
-                    </div>
-                  </div>
+          <div className="h-full overflow-hidden p-6">
+            <div className="container mx-auto h-full flex gap-3">
+              <div className="w-1/5 min-w-[180px] max-w-[260px] shrink-0 h-full overflow-hidden">
+                <FileTree server={s} serverId={id} />
+              </div>
+              <Card className="flex flex-col flex-1 h-full min-w-0 overflow-hidden">
+                <CardContent className="flex-1 p-2 overflow-hidden">
+                  <TerminalTab server={s} serverId={id} />
                 </CardContent>
               </Card>
             </div>
