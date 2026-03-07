@@ -162,7 +162,7 @@ const TIME_BUCKET_CONFIG = {
 const buildTimeSeriesData = (rangeKey, records, chartBars, sectionKey) => {
   const config = TIME_BUCKET_CONFIG[rangeKey];
   if (!config) return [];
-  const now = Date.now();
+  const now    = Date.now();
   const secKey = sectionKey === "package" ? "package" : sectionKey;
 
   return Array.from({ length: config.count }, (_, i) => {
@@ -170,21 +170,21 @@ const buildTimeSeriesData = (rangeKey, records, chartBars, sectionKey) => {
     const bucketStart = bucketEnd - config.stepMs;
     const bucketMid   = (bucketStart + bucketEnd) / 2;
 
+    // 버킷 범위 내 레코드만
     let closest = null;
     let closestDist = Infinity;
     for (const r of records) {
       const ds = /[Z+]/.test(r.collectedAt) ? r.collectedAt : `${r.collectedAt}Z`;
-      const dist = Math.abs(new Date(ds).getTime() - bucketMid);
+      const t  = new Date(ds).getTime();
+      if (t < bucketStart || t > bucketEnd) continue;
+      const dist = Math.abs(t - bucketMid);
       if (dist < closestDist) { closest = r; closestDist = dist; }
     }
 
     const secData = closest?.system?.[secKey] ?? null;
-    const total   = chartBars.reduce((sum, bar) => sum + (secData?.[bar.key] ?? 0), 0);
-    return {
-      name:  config.labelFn(i, config.count),
-      value: total,
-      fill:  total > 0 ? "#ef4444" : "#4ade80",
-    };
+    const entry   = { name: config.labelFn(i, config.count) };
+    chartBars.forEach((bar) => { entry[bar.key] = secData?.[bar.key] ?? 0; });
+    return entry;
   });
 };
 
@@ -418,7 +418,6 @@ export default function ServerOverview({ server, serverId }) {
   const chartData        = chartBars.map((b) => ({ name: b.name, value: sectionData?.[b.key] ?? 0, fill: b.fill }));
   const hasChartData     = chartData.some((d) => d.value > 0);
   const timeSeriesData   = !isLive ? buildTimeSeriesData(selectedRange, recentLogs, chartBars, selectedLogType) : [];
-  const hasTimeSeriesData = timeSeriesData.some((d) => d.value > 0);
   const tableConf = TABLE_CONFIG[selectedLogType];
   const tableItems = sectionData?.[tableConf?.listKey] ?? [];
 
@@ -846,7 +845,7 @@ export default function ServerOverview({ server, serverId }) {
 
                 {/* 차트 or 정상 상태 */}
                 {!isLive ? (
-                  hasTimeSeriesData ? (
+                  timeSeriesData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={180}>
                       <BarChart data={timeSeriesData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
@@ -856,11 +855,15 @@ export default function ServerOverview({ server, serverId }) {
                           cursor={{ fill: "hsl(var(--muted)/0.2)" }}
                           contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
                         />
-                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                          {timeSeriesData.map((entry, i) => (
-                            <Cell key={i} fill={entry.fill} />
-                          ))}
-                        </Bar>
+                        {chartBars.map((bar, idx) => (
+                          <Bar
+                            key={bar.key}
+                            dataKey={bar.key}
+                            name={bar.name}
+                            fill={bar.fill}
+                            radius={idx === chartBars.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                          />
+                        ))}
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
