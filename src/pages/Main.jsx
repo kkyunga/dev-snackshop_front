@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/api/axios";
 import { useValidateKey } from "@/hooks/queries/useValidateKey";
 import { useServerAdd } from "@/hooks/queries/useServerAdd";
+import { useServerUpdate } from "@/hooks/queries/useServerUpdate";
 import { useMiddlewareAdd } from "@/hooks/queries/useMiddlewareAdd";
 import { fetchServerSpecItems } from "@/api/serverSpec";
 import { simpleMiddlewareList } from "@/api/middlewareList.js";
@@ -934,28 +935,7 @@ export default function Main() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingServerId, setEditingServerId] = useState(null);
 
-  const { data: serverDetail } = useServerDetail(editingServerId);
-
-  useEffect(() => {
-    if (serverDetail) {
-      setNewServer({
-        id: serverDetail.id,
-        label: serverDetail.label || "",
-        ip: serverDetail.ip || "",
-        port: serverDetail.port || "",
-        osType: serverDetail.osType || "",
-        osVersion: serverDetail.osVersion || "",
-        country: serverDetail.country || "",
-        cloudService: serverDetail.cloudService || "",
-        purpose: serverDetail.purpose || "",
-        authType: serverDetail.authType || "",
-        username: serverDetail.username || "",
-        password: "",
-        keyFile: null,
-        softwareToInstall: [],
-      });
-    }
-  }, [serverDetail]);
+  const { data: serverDetail } = useServerDetail(editingServerId, { refetchInterval: false });
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([
     {
@@ -1015,6 +995,54 @@ export default function Main() {
   const cloudItemList = serverSpec?.cloudItemList || [];
   const osTypes = [...new Set(osList.map((os) => os.osType))];
 
+  useEffect(() => {
+    if (!serverDetail || !isEditMode || !serverSpec) return;
+
+    // 매 렌더마다 새 참조가 생기는 osList 등을 의존성에 넣으면
+    // 입력할 때마다 effect가 재실행되어 폼이 초기화되므로
+    // serverSpec(안정적인 쿼리 데이터)에서 직접 파싱
+    const rawOsList = (serverSpec.osList || []).map((os) => {
+      const displayName = os.text || os.value;
+      let osType = String(displayName);
+      // if (String(displayName).startsWith("Windows")) .osType = "Windows";
+      // else if (String(displayName).startsWith("macOS")) osType = "macOS";
+      return { ...os, displayName, osType };
+    });
+    const specCloudList = serverSpec.cloudItemList || [];
+    const specPurposeList = serverSpec.serverPurposeList || [];
+
+    if (rawOsList.length === 0 || specCloudList.length === 0) return;
+
+    const matchingOs = rawOsList.find(
+      (os) => os.displayName === serverDetail.osVersion || os.text === serverDetail.osVersion,
+    );
+    const matchingCloud = specCloudList.find(
+      (c) => c.text === serverDetail.cloudService || c.name === serverDetail.cloudService,
+    );
+    const matchingPurpose = specPurposeList.find(
+      (p) => p.text === serverDetail.purpose || p.name === serverDetail.purpose,
+    );
+
+    setNewServer({
+      id: serverDetail.id,
+      label: serverDetail.label || "",
+      ip: serverDetail.ip || "",
+      port: serverDetail.port || "",
+      osType: serverDetail.osType || "Linux",
+      osVersion: matchingOs ? String(matchingOs.value) : "",
+      country: serverDetail.country || "",
+      cloudService: matchingCloud ? String(matchingCloud.value) : "",
+      purpose: matchingPurpose ? String(matchingPurpose.value) : "",
+      authType: serverDetail.authType || "password",
+      username: serverDetail.username || "",
+      password: serverDetail.password || "",
+      fileName: serverDetail.fileName || "",
+      keyFile: null,
+      softwareToInstall: [],
+    });
+    setShowAddForm(true);
+  }, [serverDetail, editingServerId, serverSpec]);
+
   // 서버 spec 데이터 로드 후 osVersion 기본값 세팅
   useEffect(() => {
     if (osList.length > 0 && !newServer.osVersion) {
@@ -1040,6 +1068,7 @@ export default function Main() {
     message: "",
   });
   const [isDragging, setIsDragging] = useState(false);
+  const [keyFileDelete, setKeyFileDelete] = useState(false);
   const [newServer, setNewServer] = useState({
     label: "",
     ip: "",
@@ -1052,6 +1081,7 @@ export default function Main() {
     authType: "password",
     username: "",
     password: "",
+    fileName: "",
     keyFile: null,
     softwareToInstall: [
       // { name: "java", path: "/usr/lib/jvm" },
@@ -1110,6 +1140,8 @@ export default function Main() {
     setNewServer,
   );
 
+  const { mutate: updateServer, isPending: isUpdating } = useServerUpdate();
+
   const { mutate: addMiddleware } = useMiddlewareAdd();
 
   const handleKeyFile = (file) => {
@@ -1121,6 +1153,9 @@ export default function Main() {
         message: "지원하지 않는 파일 형식입니다 (.pem, .ppk, .key)",
       });
       return;
+    }
+    if (newServer.fileName) {
+      setKeyFileDelete(true);
     }
     validateKey(file);
   };
@@ -1140,7 +1175,6 @@ export default function Main() {
   const handleEditServer = (server) => {
     setEditingServerId(server.id);
     setIsEditMode(true);
-    setShowAddForm(true);
   };
 
   const handleConnectSubmit = (e) => {
@@ -1199,6 +1233,37 @@ export default function Main() {
         },
     );
   };
+
+  const handleUpdateServer = (e) => {
+    e.preventDefault();
+
+    updateServer(
+        {
+          userOsId: editingServerId,
+          label: newServer.label,
+          ip: newServer.ip,
+          port: newServer.port,
+          osType: newServer.osType,
+          osVersion: newServer.osVersion,
+          country: newServer.country,
+          cloudService: newServer.cloudService,
+          purpose: newServer.purpose,
+          authType: newServer.authType || "password",
+          username: newServer.username,
+          password: newServer.password,
+          keyFile: newServer.keyFile,
+          keyFileDelete,
+        },
+        {
+          onSuccess: () => {
+            setShowAddForm(false);
+            setIsEditMode(false);
+            setEditingServerId(null);
+            setKeyFileDelete(false);
+          },
+        }
+    );
+  }
 
   const handleDeleteServer = async (id) => {
     if (confirm("정말 이 서버를 삭제하시겠습니까?")) {
@@ -1540,7 +1605,7 @@ export default function Main() {
                     <CardTitle>{isEditMode ? "서버 수정" : "새 서버 추가"}</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    <form onSubmit={handleAddServer} className="space-y-6">
+                    <form onSubmit={isEditMode ? handleUpdateServer : handleAddServer} className="space-y-6">
                       {/* 기본 정보 섹션 */}
                       <div className="p-5 border-2 border-blue-200 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50">
                         <h3 className="flex items-center gap-2 mb-4 text-lg font-bold text-blue-900">
@@ -1751,6 +1816,24 @@ export default function Main() {
 
                           <div className="space-y-2 md:col-span-2">
                             <Label htmlFor="keyFile">인증키 파일 (선택)</Label>
+                            <div>
+                              {newServer.fileName && (
+                                <div className="flex items-center gap-2">
+                                  <label>{newServer.fileName}</label>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => {
+                                      setNewServer((prev) => ({ ...prev, fileName: "", keyFile: null }));
+                                      setKeyFileDelete(true);
+                                    }}
+                                  >
+                                    삭제
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                             <div
                               className={`p-6 text-center transition-colors border-2 border-dashed rounded-lg cursor-pointer ${
                                 isDragging
@@ -1881,13 +1964,25 @@ export default function Main() {
 
                       {/* 제출 버튼 */}
                       <Button
-                        type="submit"
-                        className="w-full"
-                        size="lg"
-                        disabled={isAdding}
+                          type="submit"
+                          className="w-full"
+                          size="lg"
+                          disabled={isAdding || isUpdating} // 수정 중 상태(isUpdating)도 고려
                       >
-                        {isAdding ? "서버 추가 중..." : "서버 추가"}
+                        {isEditMode ? (
+                            isUpdating ? "서버 정보 수정 중..." : "서버 정보 수정 완료"
+                        ) : (
+                            isAdding ? "새 서버 추가 중..." : "새 서버 등록하기"
+                        )}
                       </Button>
+                      {/*<Button*/}
+                      {/*  type="submit"*/}
+                      {/*  className="w-full"*/}
+                      {/*  size="lg"*/}
+                      {/*  disabled={isAdding}*/}
+                      {/*>*/}
+                      {/*  {isAdding ? "서버 추가 중..." : "서버 추가"}*/}
+                      {/*</Button>*/}
                     </form>
                   </CardContent>
                 </Card>
@@ -1991,7 +2086,6 @@ export default function Main() {
                             onClick={(e) => {
                               e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
                               handleEditServer(server); // 수정할 서버 데이터 전달
-                              setShowAddForm(true);    // "새 서버 추가" 폼 열기
                             }}
                         >
                           <Edit className="w-3 h-3 mr-1" />

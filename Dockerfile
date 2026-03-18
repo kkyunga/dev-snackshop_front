@@ -1,5 +1,5 @@
 # 1단계: 빌드 환경
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 
 # 의존성 설치 (캐시 활용)
