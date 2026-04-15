@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { userMiddlewareList } from "@/api/userMiddlewareList";
+import { simpleMiddlewareList } from "@/api/middlewareSimpleList";
+import { useMiddlewareAdd } from "@/hooks/queries/useMiddlewareAdd";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,41 +20,21 @@ import {
 import FolderSelector from "./FolderSelector";
 import TerminalTab from "./TerminalTab";
 
-export default function MiddlewareManager({ server }) {
-  const [installedMiddleware, setInstalledMiddleware] = useState([
-    {
-      id: 1,
-      name: "Apache",
-      version: "2.4.52",
-      type: "Web Server",
-      status: "running",
-      path: "/usr/local/apache2",
-    },
-    {
-      id: 2,
-      name: "MySQL",
-      version: "8.0.32",
-      type: "Database",
-      status: "running",
-      path: "/var/lib/mysql",
-    },
-    {
-      id: 3,
-      name: "PHP",
-      version: "8.1.12",
-      type: "Runtime",
-      status: "running",
-      path: "/usr/local/php",
-    },
-    {
-      id: 4,
-      name: "Redis",
-      version: "7.0.5",
-      type: "Cache",
-      status: "running",
-      path: "/usr/local/redis",
-    },
-  ]);
+export default function MiddlewareManager({ server, serverId }) {
+  const [installedMiddleware, setInstalledMiddleware] = useState([]);
+
+  useEffect(() => {
+    if (!serverId) return;
+    userMiddlewareList(serverId).then((res) => {
+      const mapped = res.data.map((item) => ({
+        name: item.name,
+        version: item.version,
+        type: item.type,
+        path: item.path,
+      }));
+      setInstalledMiddleware(mapped);
+    });
+  }, [serverId]);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addMethod, setAddMethod] = useState(null); // 'quick', 'advanced', 'manual'
@@ -60,7 +43,6 @@ export default function MiddlewareManager({ server }) {
   const [installProgress, setInstallProgress] = useState(0);
   const [currentInstalling, setCurrentInstalling] = useState("");
   const [showPathSelector, setShowPathSelector] = useState(false);
-  const [selectedPath, setSelectedPath] = useState("");
   const [advancedConfig, setAdvancedConfig] = useState({
     middleware: "",
     version: "",
@@ -69,78 +51,26 @@ export default function MiddlewareManager({ server }) {
     configOptions: {},
   });
 
-  const availableMiddleware = [
-    {
-      name: "Apache",
-      category: "Web Server",
-      versions: ["2.4.52", "2.4.51", "2.4.50"],
-      defaultPath: "/usr/local/apache2",
-      defaultPort: "80",
-    },
-    {
-      name: "Nginx",
-      category: "Web Server",
-      versions: ["1.22.1", "1.22.0", "1.20.2"],
-      defaultPath: "/etc/nginx",
-      defaultPort: "80",
-    },
-    {
-      name: "MySQL",
-      category: "Database",
-      versions: ["8.0.32", "8.0.31", "5.7.40"],
-      defaultPath: "/var/lib/mysql",
-      defaultPort: "3306",
-    },
-    {
-      name: "PostgreSQL",
-      category: "Database",
-      versions: ["15.1", "14.6", "13.9"],
-      defaultPath: "/var/lib/postgresql",
-      defaultPort: "5432",
-    },
-    {
-      name: "MongoDB",
-      category: "NoSQL",
-      versions: ["6.0.3", "5.0.14", "4.4.18"],
-      defaultPath: "/var/lib/mongodb",
-      defaultPort: "27017",
-    },
-    {
-      name: "Redis",
-      category: "Cache",
-      versions: ["7.0.5", "7.0.4", "6.2.8"],
-      defaultPath: "/usr/local/redis",
-      defaultPort: "6379",
-    },
-    {
-      name: "Docker",
-      category: "Container",
-      versions: ["23.0.0", "20.10.22", "20.10.21"],
-      defaultPath: "/var/lib/docker",
-      defaultPort: "",
-    },
-    {
-      name: "InfluxDB",
-      category: "시계열 DB",
-      versions: ["2.6.1", "2.6.0", "1.8.10"],
-      defaultPath: "/var/lib/influxdb",
-      defaultPort: "8086",
-    },
-    {
-      name: "Tomcat",
-      category: "Application Server",
-      versions: ["10.1.4", "9.0.70", "8.5.84"],
-      defaultPath: "/opt/tomcat",
-      defaultPort: "8080",
-    },
-    {
-      name: "Node.js",
-      category: "Runtime",
-      versions: ["18.12.1", "16.19.0", "14.21.2"],
-      defaultPath: "/usr/local/node",
-      defaultPort: "",
-    },
-  ];
+  const { mutate: addMiddleware } = useMiddlewareAdd();
+
+  const [availableMiddleware, setAvailableMiddleware] = useState([]);
+
+  useEffect(() => {
+    const fetchAvailableMiddleware = async () => {
+      try {
+        const data = await simpleMiddlewareList();
+        const formatted = data.middleware.map((item) => ({
+          name: item.name,
+          defaultPath: item.path,
+        }));
+        setAvailableMiddleware(formatted);
+      } catch (error) {
+        console.error("미들웨어 목록 조회 실패:", error);
+      }
+    };
+
+    fetchAvailableMiddleware();
+  }, []);
 
   const toggleMiddlewareSelection = (middleware) => {
     setSelectedMiddleware((prev) => {
@@ -153,44 +83,19 @@ export default function MiddlewareManager({ server }) {
     });
   };
 
-  const handleQuickInstall = async () => {
+  const handleQuickInstall = () => {
     if (selectedMiddleware.length === 0) return;
 
-    setIsInstalling(true);
-    setInstallProgress(0);
+    const middlewares = selectedMiddleware.map((mw) => mw.name.split(" ")[0]);
+    const mwVersion = selectedMiddleware.map((mw) => mw.name.split(" ")[1]);
 
-    const totalSteps = selectedMiddleware.length;
-    let currentStep = 0;
+    addMiddleware({
+      userOsInstanceId: serverId,
+      installPath: "",
+      middlewares,
+      mwVersion,
+    });
 
-    for (const middleware of selectedMiddleware) {
-      setCurrentInstalling(middleware.name);
-      const newId =
-        Math.max(...installedMiddleware.map((m) => m.id), 0) + 1 + currentStep;
-      const newMiddleware = {
-        id: newId,
-        name: middleware.name,
-        version: middleware.versions[0],
-        type: middleware.category,
-        status: "installing",
-        path: `/usr/local/${middleware.name.toLowerCase()}`,
-      };
-
-      setInstalledMiddleware((prev) => [...prev, newMiddleware]);
-
-      // Simulate installation time
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      setInstalledMiddleware((prev) =>
-        prev.map((m) => (m.id === newId ? { ...m, status: "running" } : m)),
-      );
-
-      currentStep++;
-      setInstallProgress((currentStep / totalSteps) * 100);
-    }
-
-    setIsInstalling(false);
-    setInstallProgress(0);
-    setCurrentInstalling("");
     setSelectedMiddleware([]);
     setShowAddDialog(false);
     setAddMethod(null);
@@ -362,11 +267,8 @@ export default function MiddlewareManager({ server }) {
                         <Package className="w-4 h-4 text-primary" />
                         <p className="text-sm font-semibold">{mw.name}</p>
                       </div>
-                      <p className="ml-6 text-xs text-muted-foreground">
-                        {mw.category}
-                      </p>
                       <p className="mt-1 ml-6 text-xs text-primary">
-                        v{mw.versions[0]}
+                        {mw.defaultPath}
                       </p>
                     </CardContent>
                   </Card>
@@ -567,14 +469,6 @@ export default function MiddlewareManager({ server }) {
                       <h4 className="font-semibold">{mw.name}</h4>
                       <Badge variant="secondary" className="text-xs">
                         {mw.type}
-                      </Badge>
-                      <Badge
-                        variant={
-                          mw.status === "running" ? "default" : "secondary"
-                        }
-                        className="text-xs"
-                      >
-                        {mw.status === "running" ? "실행중" : "설치중"}
                       </Badge>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">

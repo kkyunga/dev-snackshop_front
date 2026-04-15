@@ -6,7 +6,7 @@ import { useServerAdd } from "@/hooks/queries/useServerAdd";
 import { useServerUpdate } from "@/hooks/queries/useServerUpdate";
 import { useMiddlewareAdd } from "@/hooks/queries/useMiddlewareAdd";
 import { fetchServerSpecItems } from "@/api/serverSpec";
-import { simpleMiddlewareList } from "@/api/middlewareList.js";
+import { simpleMiddlewareList } from "@/api/middlewareSimpleList.js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

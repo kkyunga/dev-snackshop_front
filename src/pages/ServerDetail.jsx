@@ -278,7 +278,7 @@ export default function ServerDetail() {
         ) : activeTab === "middleware" ? (
           <div className="h-full overflow-y-auto">
             <div className="container p-6 mx-auto">
-              <MiddlewareManager server={s} />
+              <MiddlewareManager server={s} serverId={id} />
             </div>
           </div>
         ) : activeTab === "backup" ? (
