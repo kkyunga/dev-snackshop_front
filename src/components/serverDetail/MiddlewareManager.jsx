@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { userMiddlewareList } from "@/api/userMiddlewareList";
-import { simpleMiddlewareList } from "@/api/middlewareSimpleList";
+import { simpleMiddlewareList } from "@/api/middlewareList";
 import { useMiddlewareAdd } from "@/hooks/queries/useMiddlewareAdd";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -23,7 +23,7 @@ import TerminalTab from "./TerminalTab";
 export default function MiddlewareManager({ server, serverId }) {
   const [installedMiddleware, setInstalledMiddleware] = useState([]);
 
-  useEffect(() => {
+  const fetchInstalledMiddleware = () => {
     if (!serverId) return;
     userMiddlewareList(serverId).then((res) => {
       const mapped = res.data.map((item) => ({
@@ -34,6 +34,10 @@ export default function MiddlewareManager({ server, serverId }) {
       }));
       setInstalledMiddleware(mapped);
     });
+  };
+
+  useEffect(() => {
+    fetchInstalledMiddleware();
   }, [serverId]);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -59,9 +63,12 @@ export default function MiddlewareManager({ server, serverId }) {
     const fetchAvailableMiddleware = async () => {
       try {
         const data = await simpleMiddlewareList();
-        const formatted = data.middleware.map((item) => ({
+        const formatted = data.map((item) => ({
           name: item.name,
           defaultPath: item.path,
+          category: item.category,
+          versions: item.versions ?? [],
+          defaultPort: item.defaultPort,
         }));
         setAvailableMiddleware(formatted);
       } catch (error) {
@@ -86,15 +93,19 @@ export default function MiddlewareManager({ server, serverId }) {
   const handleQuickInstall = () => {
     if (selectedMiddleware.length === 0) return;
 
-    const middlewares = selectedMiddleware.map((mw) => mw.name.split(" ")[0]);
-    const mwVersion = selectedMiddleware.map((mw) => mw.name.split(" ")[1]);
-
-    addMiddleware({
-      userOsInstanceId: serverId,
-      installPath: "",
-      middlewares,
-      mwVersion,
-    });
+    addMiddleware(
+      {
+        userOsInstanceId: serverId,
+        installPath: "",
+        middlewares: selectedMiddleware.map((mw) => mw.name),
+        mwVersion: [],
+      },
+      {
+        onSuccess: () => {
+          fetchInstalledMiddleware();
+        },
+      },
+    );
 
     setSelectedMiddleware([]);
     setShowAddDialog(false);
@@ -102,19 +113,20 @@ export default function MiddlewareManager({ server, serverId }) {
   };
 
   const handleAdvancedAdd = () => {
-    const newId = Math.max(...installedMiddleware.map((m) => m.id), 0) + 1;
-    const middleware = availableMiddleware.find(
-      (m) => m.name === advancedConfig.middleware,
+    addMiddleware(
+      {
+        userOsInstanceId: serverId,
+        installPath: advancedConfig.installPath,
+        middlewares: [advancedConfig.middleware],
+        mwVersion: [advancedConfig.version],
+      },
+      {
+        onSuccess: () => {
+          fetchInstalledMiddleware();
+        },
+      },
     );
-    const newMiddleware = {
-      id: newId,
-      name: advancedConfig.middleware,
-      version: advancedConfig.version,
-      type: middleware?.category || "Custom",
-      status: "installing",
-      path: advancedConfig.installPath,
-    };
-    setInstalledMiddleware([...installedMiddleware, newMiddleware]);
+
     setShowAddDialog(false);
     setAddMethod(null);
     setAdvancedConfig({
@@ -124,12 +136,6 @@ export default function MiddlewareManager({ server, serverId }) {
       port: "",
       configOptions: {},
     });
-
-    setTimeout(() => {
-      setInstalledMiddleware((prev) =>
-        prev.map((m) => (m.id === newId ? { ...m, status: "running" } : m)),
-      );
-    }, 3000);
   };
 
   const handleDelete = (id) => {
@@ -320,6 +326,7 @@ export default function MiddlewareManager({ server, serverId }) {
                     version: "",
                     installPath: selectedMw?.defaultPath || "",
                     port: selectedMw?.defaultPort || "",
+                    defaultPort: selectedMw?.defaultPort ?? null,
                   });
                 }}
               >
@@ -349,9 +356,9 @@ export default function MiddlewareManager({ server, serverId }) {
                     <option value="">선택하세요</option>
                     {availableMiddleware
                       .find((m) => m.name === advancedConfig.middleware)
-                      ?.versions.map((v) => (
+                      ?.versions?.map((v) => (
                         <option key={v} value={v}>
-                          v{v}
+                          {v}
                         </option>
                       ))}
                   </select>
@@ -395,9 +402,9 @@ export default function MiddlewareManager({ server, serverId }) {
                       })
                     }
                   />
-                  {advancedConfig.port && (
+                  {advancedConfig.middleware && (
                     <p className="text-xs text-muted-foreground">
-                      기본 포트: {advancedConfig.port}
+                      기본 포트: {advancedConfig.defaultPort ?? "기본값 없음"}
                     </p>
                   )}
                 </div>
