@@ -16,6 +16,9 @@ import {
   Download,
   FolderSearch,
   Terminal as TerminalIcon,
+  CheckCircle,
+  XCircle,
+  X,
 } from "lucide-react";
 import FolderSelector from "./FolderSelector";
 import TerminalTab from "./TerminalTab";
@@ -46,6 +49,7 @@ export default function MiddlewareManager({ server, serverId }) {
   const [isInstalling, setIsInstalling] = useState(false);
   const [installProgress, setInstallProgress] = useState(0);
   const [currentInstalling, setCurrentInstalling] = useState("");
+  const [installResults, setInstallResults] = useState([]);
   const [showPathSelector, setShowPathSelector] = useState(false);
   const [advancedConfig, setAdvancedConfig] = useState({
     middleware: "",
@@ -101,7 +105,8 @@ export default function MiddlewareManager({ server, serverId }) {
         mwVersion: [],
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          setInstallResults(data);
           fetchInstalledMiddleware();
         },
       },
@@ -121,7 +126,8 @@ export default function MiddlewareManager({ server, serverId }) {
         mwVersion: [advancedConfig.version],
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
+          setInstallResults(data);
           fetchInstalledMiddleware();
         },
       },
@@ -459,6 +465,63 @@ export default function MiddlewareManager({ server, serverId }) {
               닫기
             </Button>
           </div>
+        </Card>
+      )}
+
+      {installResults.length > 0 && (
+        <Card className="border-primary/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">설치 결과</CardTitle>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setInstallResults([])}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {installResults.map((result, idx) => {
+              const isSuccess = result.status === "설치성공";
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                    isSuccess
+                      ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800"
+                      : "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {isSuccess ? (
+                      <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">
+                        {result.middlewareName}
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          v{result.version}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(result.installedAt).toLocaleString("ko-KR")}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={isSuccess ? "default" : "destructive"}
+                    className="text-xs"
+                  >
+                    {result.status}
+                  </Badge>
+                </div>
+              );
+            })}
+          </CardContent>
         </Card>
       )}
 

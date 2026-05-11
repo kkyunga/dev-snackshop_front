@@ -8,9 +8,9 @@ export const useMiddlewareAdd = () => {
         mutationFn: ({ userOsInstanceId, installPath, mwVersion, middlewares }) =>
             middlewareAdd(userOsInstanceId, installPath, mwVersion, middlewares),
 
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries(["middlewares"]);
-            console.log("미들웨어 설치 성공!");
+            console.log("미들웨어 설치 결과:", data);
         },
 
         onError: (error) => {
