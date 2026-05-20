@@ -1,16 +1,57 @@
-# React + Vite
+# SERVERHUB (서버 허브)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SERVERHUB는 다양한 클라우드 환경 및 온프레미스 서버를 한 곳에서 효율적으로 관리하고 모니터링할 수 있는 통합 서버 관리 플랫폼입니다. 사용자 친화적인 인터페이스를 통해 복잡한 서버 인프라를 직관적으로 제어할 수 있도록 돕습니다.
 
-Currently, two official plugins are available:
+## 🚀 주요 기능
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. 통합 서버 대시보드
+* **서버 현황 파악:** 등록된 모든 서버의 상태(Active/Inactive), IP 주소, OS 정보 등을 한눈에 확인할 수 있는 대시보드를 제공합니다.
+* **서버 추가 및 관리:** AWS, Azure, GCP 등 다양한 클라우드 서비스와 Linux, Windows, macOS 등 주요 OS를 지원합니다. 서버 별명, 용도 등을 설정하여 체계적인 관리가 가능합니다.
+* **강력한 인증 지원:** 일반 비밀번호 인증 방식과 더불어 인증키 파일(.pem, .ppk, .key)을 활용한 보안 접속을 지원하며, 키 파일의 유효성 검사 기능을 포함합니다.
 
-## React Compiler
+### 2. 서버 정보 및 실시간 모니터링 (Overview)
+* **상세 사양 확인:** 서버의 기본 정보 및 하드웨어 스펙을 상세하게 조회할 수 있습니다.
+* **리소스 시각화:** CPU 사용률, 메모리 점유율, 디스크 사용량 등 서버의 핵심 자원 상태를 실시간 차트(ApexCharts, Recharts)로 시각화하여 제공합니다.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 3. 웹 기반 터미널 및 파일 시스템 탐색
+* **통합 웹 터미널:** 별도의 SSH 클라이언트 설치 없이 브라우저에서 즉시 서버 명령어를 실행할 수 있는 xterm.js 기반의 고성능 터미널을 제공합니다.
+* **파일 시스템 브라우저:** 서버 내의 디렉토리와 파일 구조를 트리 형태로 탐색할 수 있는 인터페이스를 제공하여 원격 서버의 파일 관리를 용이하게 합니다.
 
-## Expanding the ESLint configuration
+### 4. 미들웨어 및 소프트웨어 관리
+* **자동화된 설치 지원:** 서버 등록 단계에서 Java, Nginx, Redis, MySQL 등 필수 미들웨어를 선택하여 자동으로 설치 경로를 지정하고 관리할 수 있습니다.
+* **미들웨어 인벤토리:** 각 서버별로 설치된 소프트웨어의 종류와 버전을 체계적으로 관리하는 전용 매니저 기능을 제공합니다.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 5. 사용자 활동 로그 및 알림 서비스
+* **마이페이지 활동 기록:** 서버 접속 이력, 미들웨어 설치/삭제 기록, 시스템 변경 사항 등을 타임라인 형태로 확인하여 작업 이력을 추적할 수 있습니다.
+* **지능형 알림 시스템:** 정기 점검 일정, 소프트웨어 업데이트 권고, 보안 취약점 패치 알림 등을 통해 시스템의 안정성을 유지할 수 있도록 지원합니다.
+
+## 🛠 기술 스택
+
+* **Frontend Framework:** React 19
+* **Build Tool:** Vite
+* **Styling:** Tailwind CSS, PostCSS
+* **State Management:** TanStack Query (React Query)
+* **UI Components:** Radix UI, Lucide Icons
+* **Data Visualization:** ApexCharts, Recharts
+* **Terminal Emulation:** xterm.js
+* **Networking:** Axios, STOMP/SockJS (WebSocket)
+
+## 💻 시작하기
+
+### 설치
+```bash
+npm install
+```
+
+### 개발 서버 실행
+```bash
+npm run dev
+```
+
+### 빌드
+```bash
+npm run build
+```
+
+---
+*참고: 본 문서는 사용자의 요청에 따라 '백업 및 보안', '운영 및 배포' 섹션을 제외한 핵심 기능을 중심으로 작성되었습니다.*
